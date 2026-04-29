@@ -142,8 +142,5 @@ SPARS/
 └── PPD_LAB.xlsx             # Sample/Template data source
 ```
 
-## 🤝 Contributing
-Contributions, issues, and feature requests are welcome! If you find any bugs or have suggestions for improvements, feel free to open an issue or submit a pull request.
 
-## 📜 License
-This project is open-source and available under the [MIT License](LICENSE).
+
