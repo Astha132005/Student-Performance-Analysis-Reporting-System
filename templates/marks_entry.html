@@ -1,0 +1,206 @@
+{% from '_macros.html' import sidebar, page_header, stat_card, flash_messages, table_toolbar, shortcuts_overlay, page_scripts, icon_check_circle, icon_clock, icon_upload %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mark's Entry : SPARS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+
+<body>
+
+<div class="layout">
+
+    {% if role == 'admin' %}
+        {{ sidebar('admin', 'marks') }}
+    {% else %}
+        {{ sidebar('faculty', 'marks', session['user']) }}
+    {% endif %}
+
+    <div class="main">
+
+        <div class="print-header">
+            <h1>SPARS : Mark's Entry Hub</h1>
+        </div>
+
+        {% if role == 'admin' %}
+            {% set breadcrumbs = [{'label': 'Dashboard', 'url': '/admin_dashboard'}, {'label': "Mark's Entry", 'url': '#'}] %}
+        {% else %}
+            {% set breadcrumbs = [{'label': 'Dashboard', 'url': '/faculty_dashboard'}, {'label': "Mark's Entry", 'url': '#'}] %}
+        {% endif %}
+
+        {{ page_header(
+            "Mark's Entry Hub",
+            'Control the upload permission window and monitor submission statuses.' if role == 'admin' else 'Upload component marks for any subject while the permission window is active.',
+            breadcrumbs
+        ) }}
+
+        <!-- Branch Filter -->
+        <form method="get" class="filter-bar" style="margin-bottom: var(--space-xl);">
+            <div class="filter-group">
+                <span class="filter-label">Filter by Branch</span>
+                <select name="branch" onchange="this.form.submit()">
+                    <option value="">All Branches</option>
+                    {% for b in all_branches %}
+                    <option value="{{ b.branch }}" {% if branch_filter == b.branch %}selected{% endif %}>{{ b.branch }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+
+        <!-- Flash Messages -->
+        {% if message %}
+        <div class="alert {{ 'alert-success' if msg_type == 'success' else 'alert-error' }}">
+            {% if msg_type == 'success' %}✓{% else %}✕{% endif %} {{ message }}
+        </div>
+        {% endif %}
+        {{ flash_messages() }}
+
+        <!-- Status Cards -->
+        <div class="stat-grid">
+            <div class="stat-card {{ 'accent-success' if is_live else ('accent-warning' if permission and permission.is_active else 'accent-danger') }}">
+                <div class="stat-header">
+                    <span class="stat-label">Permission Status</span>
+                    <div class="stat-icon {{ 'success' if is_live else ('warning' if permission and permission.is_active else 'danger') }}">
+                        {{ icon_check_circle() }}
+                    </div>
+                </div>
+                <div class="stat-value">
+                    {% if is_live %}
+                    <span class="badge badge-live">Active</span>
+                    {% elif permission and permission.is_active %}
+                    <span class="badge badge-warning">⏳ Scheduled</span>
+                    {% else %}
+                    <span class="badge badge-danger">Inactive</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if permission and permission.start_time %}
+            <div class="stat-card">
+                <div class="stat-header">
+                    <span class="stat-label">Window Start</span>
+                    <div class="stat-icon">{{ icon_clock() }}</div>
+                </div>
+                <div class="stat-value" style="font-size: 1.1rem;">{{ permission.start_time.strftime('%d %b %Y, %I:%M %p') }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <span class="stat-label">Window End</span>
+                    <div class="stat-icon">{{ icon_clock() }}</div>
+                </div>
+                <div class="stat-value" style="font-size: 1.1rem;">{{ permission.end_time.strftime('%d %b %Y, %I:%M %p') }}</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Admin: Set Permission -->
+        {% if role == 'admin' %}
+        <div class="glass-card mb-xl">
+            <h2 style="font-size: 1.15rem; margin-bottom: var(--space-lg);">Set Upload Permission Window</h2>
+            <form method="POST" class="permission-form">
+                <input type="hidden" name="action" value="set_permission">
+                <div class="form-group">
+                    <label>Start Date & Time</label>
+                    <input type="datetime-local" name="start_time" required
+                        {% if permission and permission.start_time %} value="{{ permission.start_time.strftime('%Y-%m-%dT%H:%M') }}" {% endif %}>
+                </div>
+                <div class="form-group">
+                    <label>End Date & Time</label>
+                    <input type="datetime-local" name="end_time" required
+                        {% if permission and permission.end_time %} value="{{ permission.end_time.strftime('%Y-%m-%dT%H:%M') }}" {% endif %}>
+                </div>
+                <button type="submit">Activate Permission</button>
+            </form>
+
+            {% if is_live or (permission and permission.is_active) %}
+            <form method="POST" style="margin-top: var(--space-md);">
+                <input type="hidden" name="action" value="deactivate">
+                <button type="submit" class="btn-danger">Deactivate Permission</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Faculty Upload Section -->
+        {% if is_live and role == 'faculty' %}
+        <div class="section-divider">
+            <h2>Upload Component Marks (.xlsx)</h2>
+        </div>
+
+        <div class="upload-grid">
+            {% set components = [('midsem', 'Midsem Exam'), ('quiz', 'Quiz'), ('assignment', 'Assignment'), ('attendance', 'Attendance')] %}
+            {% for comp_val, comp_label in components %}
+            <div class="upload-card">
+                <h3 class="mb-sm">{{ comp_label }}</h3>
+                <form action="/faculty_upload" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="component" value="{{ comp_val }}">
+                    <select name="subject_name" required class="mb-md">
+                        <option value=""> Select Subject </option>
+                        {% for sub in subject_list %}
+                        <option value="{{ sub.subject_name }}">{{ sub.subject_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="file" name="file" accept=".xlsx" required class="mb-md">
+                    <button type="submit" class="w-full">
+                        {{ icon_upload() }} Upload {{ comp_label }}
+                    </button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Upload Status Table -->
+        <div class="table-container">
+            {{ table_toolbar('upload-status-table', 'Upload Status by Subject', 'upload_status') }}
+            <div class="table-wrapper">
+                <table id="upload-status-table" class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Subject</th>
+                            <th>Midsem</th>
+                            <th>Quiz</th>
+                            <th>Assignment</th>
+                            <th>Attendance</th>
+                            <th>Combined</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if subjects_status %}
+                            {% for sub in subjects_status %}
+                            <tr>
+                                <td class="fw-600 text-primary">{{ sub.subject_name }}</td>
+                                <td>{% if sub.midsem_at %}<span class="text-success">✅</span>{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                                <td>{% if sub.quiz_at %}<span class="text-success">✅</span>{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                                <td>{% if sub.assignment_at %}<span class="text-success">✅</span>{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                                <td>{% if sub.attendance_at %}<span class="text-success">✅</span>{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                                <td>
+                                    {% if sub.combined %}
+                                    <span class="badge badge-success">Done</span>
+                                    {% elif sub.midsem_at and sub.quiz_at and sub.assignment_at and sub.attendance_at %}
+                                    <span class="badge badge-warning">Pending</span>
+                                    {% else %}
+                                    <span class="text-muted" style="font-size: 0.8rem;">Incomplete</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="6" style="text-align: center; padding: 2rem;" class="text-muted">No subjects found</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+{{ shortcuts_overlay() }}
+{{ page_scripts(role) }}
+
+</body>
+</html>

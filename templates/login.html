@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SPARS : Student Performance Analysis & Reporting System Login">
+    <title>SPARS : Login</title>
+    <!-- Light mode only: no dark theme -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0f172a;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ── Split Background ── */
+        .split-bg {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            transition: none;
+            z-index: 0;
+        }
+
+        .split-left {
+            flex: 1;
+            background: linear-gradient(160deg, #1e3a5f 0%, #1d4ed8 50%, #2563eb 100%);
+            position: relative;
+            transition: flex 0.7s cubic-bezier(0.77,0,0.18,1);
+        }
+
+        .split-right {
+            flex: 1;
+            background: linear-gradient(160deg, #4c1d95 0%, #6d28d9 50%, #7c3aed 100%);
+            position: relative;
+            transition: flex 0.7s cubic-bezier(0.77,0,0.18,1);
+        }
+
+        /* Expand active side — admin gets big left, faculty gets big right */
+        .split-bg.admin-mode .split-left  { flex: 1.5; }
+        .split-bg.admin-mode .split-right { flex: 0.5; }
+        .split-bg.faculty-mode .split-left  { flex: 0.5; }
+        .split-bg.faculty-mode .split-right { flex: 1.5; }
+
+        /* Panel labels */
+        .panel-label {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255,255,255,0.18);
+            font-size: clamp(3rem, 8vw, 7rem);
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            pointer-events: none;
+            transition: opacity 0.5s, color 0.5s;
+            white-space: nowrap;
+        }
+
+        .split-left .panel-label  { right: 2rem; text-align: right; }
+        .split-right .panel-label { left: 2rem; }
+
+        .split-bg.admin-mode   .split-left  .panel-label { color: rgba(255,255,255,0.35); }
+        .split-bg.faculty-mode .split-right .panel-label { color: rgba(255,255,255,0.35); }
+
+        /* ── Bubbles ── */
+        .bubble {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        /* Left panel bubbles — blue gradient */
+        .split-left .bubble {
+            background: radial-gradient(circle at 35% 35%, rgba(219,234,254,0.9), rgba(59,130,246,0.45) 60%, rgba(29,78,216,0.2));
+            border: 1.5px solid rgba(147,197,253,0.6);
+        }
+        .split-left .bubble.glow {
+            box-shadow: 0 0 28px 8px rgba(96,165,250,0.45), inset 0 0 12px rgba(219,234,254,0.3);
+        }
+
+        /* Right panel bubbles — purple gradient */
+        .split-right .bubble {
+            background: radial-gradient(circle at 35% 35%, rgba(237,233,254,0.9), rgba(139,92,246,0.45) 60%, rgba(109,40,217,0.2));
+            border: 1.5px solid rgba(196,181,253,0.6);
+        }
+        .split-right .bubble.glow {
+            box-shadow: 0 0 28px 8px rgba(167,139,250,0.45), inset 0 0 12px rgba(237,233,254,0.3);
+        }
+
+        /* Floating animations — true suspended oscillation, bubbles hover in place */
+        @keyframes floatA {
+            0%   { transform: translate(0px, 0px) scale(1); }
+            25%  { transform: translate(12px, -18px) scale(1.02); }
+            50%  { transform: translate(-8px, -32px) scale(0.98); }
+            75%  { transform: translate(16px, -16px) scale(1.03); }
+            100% { transform: translate(0px, 0px) scale(1); }
+        }
+        @keyframes floatB {
+            0%   { transform: translate(0px, 0px) scale(1) rotate(0deg); }
+            33%  { transform: translate(-14px, -22px) scale(1.04) rotate(4deg); }
+            66%  { transform: translate(10px, -10px) scale(0.97) rotate(-3deg); }
+            100% { transform: translate(0px, 0px) scale(1) rotate(0deg); }
+        }
+        @keyframes floatC {
+            0%   { transform: translate(0px, 0px) scale(1); }
+            20%  { transform: translate(20px, -8px) scale(0.96); }
+            50%  { transform: translate(6px, -28px) scale(1.05); }
+            80%  { transform: translate(-16px, -14px) scale(0.98); }
+            100% { transform: translate(0px, 0px) scale(1); }
+        }
+        @keyframes floatD {
+            0%   { transform: translate(0px, 0px) scale(1); }
+            50%  { transform: translate(-18px, -24px) scale(1.06); }
+            100% { transform: translate(0px, 0px) scale(1); }
+        }
+        @keyframes floatE {
+            0%   { transform: translate(0px, 0px) scale(1); }
+            15%  { transform: translate(8px, -14px) scale(1.01); }
+            40%  { transform: translate(-20px, -6px) scale(0.95); }
+            65%  { transform: translate(4px, -30px) scale(1.04); }
+            85%  { transform: translate(-10px, -18px) scale(0.98); }
+            100% { transform: translate(0px, 0px) scale(1); }
+        }
+        @keyframes pulse-bubble {
+            0%, 100% { opacity: 0.55; }
+            50%       { opacity: 1; }
+        }
+
+        /* ── Login Box ── */
+        .login-stage {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .login-track {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            justify-content: center;
+            transition: justify-content 0.0s;
+        }
+
+        .login-box {
+            background: rgba(255, 255, 255, 0.97);
+            border-radius: 24px;
+            padding: 2.5rem 2.75rem;
+            width: 100%;
+            max-width: 500px;
+            box-shadow:
+                0 32px 80px rgba(0,0,0,0.4),
+                0 8px 24px rgba(0,0,0,0.2),
+                inset 0 1px 0 rgba(255,255,255,0.9);
+            pointer-events: all;
+            position: absolute;
+            /* Default: center */
+            left: 50%;
+            transform: translateX(-50%);
+            transition:
+                left 0.7s cubic-bezier(0.77,0,0.18,1),
+                transform 0.7s cubic-bezier(0.77,0,0.18,1),
+                box-shadow 0.5s ease;
+        }
+
+        /* Admin → slides to left 33% */
+        body.admin-mode .login-box {
+            left: 33%;
+            transform: translateX(-50%);
+            box-shadow:
+                0 40px 100px rgba(29,78,216,0.35),
+                0 8px 24px rgba(0,0,0,0.25),
+                inset 0 1px 0 rgba(255,255,255,0.9);
+        }
+
+        /* Faculty → slides to right 67% */
+        body.faculty-mode .login-box {
+            left: 67%;
+            transform: translateX(-50%);
+            box-shadow:
+                0 40px 100px rgba(109,40,217,0.35),
+                0 8px 24px rgba(0,0,0,0.25),
+                inset 0 1px 0 rgba(255,255,255,0.9);
+        }
+
+        /* ── Brand ── */
+        .brand-wrap { text-align: center; margin-bottom: 1.75rem; }
+
+        .ad-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 52px; height: 52px;
+            border-radius: 14px;
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 0.75rem;
+            transition: background 0.6s ease;
+        }
+
+        body.admin-mode   .ad-badge { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+        body.faculty-mode .ad-badge { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+        body:not(.admin-mode):not(.faculty-mode) .ad-badge { background: linear-gradient(135deg, #3b82f6, #7c3aed); }
+
+        .brand-name {
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: 3px;
+            transition: background-image 0.6s ease;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: block;
+        }
+
+        body.admin-mode   .brand-name { background-image: linear-gradient(135deg, #1d4ed8, #3b82f6); }
+        body.faculty-mode .brand-name { background-image: linear-gradient(135deg, #6d28d9, #7c3aed); }
+        body:not(.admin-mode):not(.faculty-mode) .brand-name { background-image: linear-gradient(135deg, #3b82f6, #7c3aed); }
+
+        .brand-sub {
+            font-size: 0.78rem;
+            color: #64748b;
+            font-weight: 400;
+            margin-top: 0.2rem;
+        }
+
+        /* ── Error ── */
+        .alert-error {
+            background: rgba(220,38,38,0.08);
+            border: 1px solid rgba(220,38,38,0.25);
+            color: #b91c1c;
+            border-radius: 10px;
+            padding: 0.65rem 0.9rem;
+            font-size: 0.82rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+
+        /* ── Role Toggle ── */
+        .role-toggle {
+            display: flex;
+            background: #f1f5f9;
+            border-radius: 50px;
+            padding: 4px;
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .role-toggle-slider {
+            position: absolute;
+            top: 4px; bottom: 4px;
+            width: calc(50% - 4px);
+            border-radius: 50px;
+            transition: all 0.45s cubic-bezier(0.77,0,0.18,1);
+            left: 4px;
+        }
+
+        body.admin-mode   .role-toggle-slider { left: 4px; background: linear-gradient(135deg, #3b82f6, #2563eb); box-shadow: 0 4px 12px rgba(59,130,246,0.4); }
+        body.faculty-mode .role-toggle-slider { left: calc(50%); background: linear-gradient(135deg, #7c3aed, #6d28d9); box-shadow: 0 4px 12px rgba(124,58,237,0.4); }
+        body:not(.admin-mode):not(.faculty-mode) .role-toggle-slider { left: 4px; background: linear-gradient(135deg, #3b82f6, #2563eb); box-shadow: 0 4px 12px rgba(59,130,246,0.4); }
+
+        .role-btn {
+            flex: 1;
+            text-align: center;
+            padding: 0.55rem 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: #64748b;
+            position: relative;
+            z-index: 1;
+            transition: color 0.4s;
+            user-select: none;
+            border-radius: 50px;
+        }
+
+        body.admin-mode   .role-btn[data-role="admin"]   { color: white; }
+        body.faculty-mode .role-btn[data-role="faculty"] { color: white; }
+        body:not(.admin-mode):not(.faculty-mode) .role-btn[data-role="admin"] { color: white; }
+
+        .role-btn span.role-icon { margin-right: 0.35rem; font-size: 0.9rem; }
+
+        /* ── Input Group ── */
+        .input-group { margin-bottom: 1rem; }
+
+        .input-group label {
+            display: block;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 0.4rem;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 0.7rem 0.9rem;
+            border-radius: 10px;
+            border: 1.5px solid #e2e8f0;
+            font-family: inherit;
+            font-size: 0.9rem;
+            color: #1e293b;
+            background: #f8fafc;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s, background 0.3s;
+        }
+
+        .input-group input:focus {
+            background: #fff;
+            border-color: transparent;
+            box-shadow: 0 0 0 2.5px #3b82f6;
+        }
+
+        body.faculty-mode .input-group input:focus {
+            box-shadow: 0 0 0 2.5px #7c3aed;
+        }
+
+        /* ── Submit Button ── */
+        .login-btn {
+            width: 100%;
+            padding: 0.85rem;
+            border: none;
+            border-radius: 12px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: white;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            letter-spacing: 0.03em;
+            transition: all 0.4s cubic-bezier(0.77,0,0.18,1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.admin-mode .login-btn,
+        body:not(.admin-mode):not(.faculty-mode) .login-btn {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            box-shadow: 0 6px 20px rgba(59,130,246,0.45);
+        }
+
+        body.faculty-mode .login-btn {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            box-shadow: 0 6px 20px rgba(124,58,237,0.45);
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        body.admin-mode .login-btn:hover { box-shadow: 0 10px 28px rgba(59,130,246,0.55); }
+        body.faculty-mode .login-btn:hover { box-shadow: 0 10px 28px rgba(124,58,237,0.55); }
+
+        .login-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+            border-radius: inherit;
+        }
+
+        /* ── Footer ── */
+        .login-footer {
+            text-align: center;
+            font-size: 0.72rem;
+            color: #94a3b8;
+            margin-top: 1.25rem;
+            padding-top: 1rem;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        /* ── Mode hint ── */
+        .mode-hint {
+            text-align: center;
+            font-size: 0.76rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            padding: 0.4rem 0.75rem;
+            border-radius: 50px;
+            display: inline-block;
+            width: 100%;
+            transition: all 0.5s;
+        }
+
+        body.admin-mode .mode-hint {
+            background: rgba(59,130,246,0.1);
+            color: #2563eb;
+        }
+        body.faculty-mode .mode-hint {
+            background: rgba(124,58,237,0.1);
+            color: #7c3aed;
+        }
+        body:not(.admin-mode):not(.faculty-mode) .mode-hint {
+            background: rgba(59,130,246,0.1);
+            color: #2563eb;
+        }
+
+        /* Hidden radio inputs */
+        input[type="radio"] { display: none; }
+
+        /* Lottie-style bounce on box appear */
+        @keyframes boxBounceIn {
+            0%   { opacity: 0; transform: translateX(-50%) scale(0.88); }
+            60%  { transform: translateX(-50%) scale(1.02); }
+            100% { opacity: 1; transform: translateX(-50%) scale(1); }
+        }
+
+        .login-box { animation: boxBounceIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+    </style>
+</head>
+<body class="admin-mode login-page">
+<!-- Split background panels -->
+<div class="split-bg admin-mode" id="split-bg">
+    <div class="split-left" id="panel-left">
+        <span class="panel-label">ADMIN</span>
+    </div>
+    <div class="split-right" id="panel-right">
+        <span class="panel-label">FACULTY</span>
+    </div>
+</div>
+
+<!-- Login Box (absolutely positioned, slides on role change) -->
+<div class="login-stage">
+    <div class="login-box" id="login-box">
+
+        <div class="brand-wrap">
+            <div class="ad-badge">AD</div>
+            <span class="brand-name">SPARS</span>
+            <div class="brand-sub">Student Performance Analysis &amp; Reporting System</div>
+        </div>
+
+        {% if error %}
+        <div class="alert-error">✕ {{ error }}</div>
+        {% endif %}
+
+        <!-- Role Toggle (visual, not the real radio) -->
+        <div class="role-toggle" id="role-toggle">
+            <div class="role-toggle-slider" id="toggle-slider"></div>
+            <div class="role-btn" data-role="admin" onclick="setRole('admin')">
+                <span class="role-icon">🛡️</span> Admin
+            </div>
+            <div class="role-btn" data-role="faculty" onclick="setRole('faculty')">
+                <span class="role-icon">📚</span> Faculty
+            </div>
+        </div>
+
+        <div class="mode-hint" id="mode-hint">Signing in as Administrator</div>
+
+        <form method="POST" id="login-form">
+            <!-- Hidden role input (submitted with form) -->
+            <input type="radio" name="role" value="admin" id="role-admin" checked>
+            <input type="radio" name="role" value="faculty" id="role-faculty">
+
+            <div class="input-group">
+                <label for="login-username">Username</label>
+                <input type="text" id="login-username" name="username"
+                       placeholder="Enter your username" required autocomplete="username">
+            </div>
+
+            <div class="input-group">
+                <label for="login-password">Password</label>
+                <input type="password" id="login-password" name="password"
+                       placeholder="Enter your password" required autocomplete="current-password">
+            </div>
+
+            <button type="submit" class="login-btn" id="login-btn">Sign In →</button>
+        </form>
+
+        <div class="login-footer">
+            Faculty: use assigned username and password &nbsp;·&nbsp; Admin: use authorized credentials
+        </div>
+    </div>
+</div>
+
+<script>
+// ── Bubble generation — scattered across full panel area ──
+var floatAnims = ['floatA', 'floatB', 'floatC', 'floatD', 'floatE'];
+
+function createBubbles(container) {
+    var sizeGroups = [
+        { min: 18, max: 36,  count: 5 },
+        { min: 40, max: 70,  count: 6 },
+        { min: 75, max: 120, count: 4 },
+        { min: 130, max: 200, count: 2 }
+    ];
+
+    var bubbles = [];
+    sizeGroups.forEach(function(g) {
+        for (var i = 0; i < g.count; i++)
+            bubbles.push(g.min + Math.random() * (g.max - g.min));
+    });
+
+    // Shuffle so big and small are mixed
+    bubbles.sort(function() { return Math.random() - 0.5; });
+
+    bubbles.forEach(function(size, i) {
+        var b = document.createElement('div');
+        b.classList.add('bubble');
+        if (i % 3 === 0) b.classList.add('glow');
+
+        b.style.width  = size + 'px';
+        b.style.height = size + 'px';
+
+        // Scatter across FULL panel — not just bottom
+        b.style.left = (2 + Math.random() * 88) + '%';
+        b.style.top  = (2 + Math.random() * 88) + '%';
+
+        // Pick animation + randomize timing
+        var anim = floatAnims[i % floatAnims.length];
+        var dur  = 6 + Math.random() * 12;         // 6–18s per cycle
+        var del  = -(Math.random() * dur);          // start mid-cycle = already floating!
+        var pulDur = 2.5 + Math.random() * 4;
+        var pulDel = Math.random() * 3;
+
+        b.style.animation =
+            anim + ' ' + dur.toFixed(1) + 's ' + del.toFixed(1) + 's ease-in-out infinite, ' +
+            'pulse-bubble ' + pulDur.toFixed(1) + 's ' + pulDel.toFixed(1) + 's ease-in-out infinite';
+
+        // Depth: large bubbles more transparent
+        var base = size > 120 ? 0.28 : size > 70 ? 0.48 : 0.68;
+        b.style.opacity = Math.min(0.92, base + Math.random() * 0.22).toFixed(2);
+
+        container.appendChild(b);
+    });
+}
+
+createBubbles(document.getElementById('panel-left'));
+createBubbles(document.getElementById('panel-right'));
+
+
+// ── Role switching ──
+var currentRole = 'admin';
+
+function setRole(role) {
+    currentRole = role;
+    document.body.className = role + '-mode';
+    document.getElementById('split-bg').className = 'split-bg ' + role + '-mode';
+
+    // Sync actual radio
+    document.getElementById('role-' + role).checked = true;
+
+    // Update hint
+    var hint = document.getElementById('mode-hint');
+    hint.textContent = role === 'admin'
+        ? 'Signing in as Administrator'
+        : 'Signing in as Faculty';
+
+    // Update button
+    document.getElementById('login-btn').textContent = role === 'admin'
+        ? 'Sign In as Admin →'
+        : 'Sign In as Faculty →';
+}
+
+// Restore role if page reloads after error
+{% if error %}
+// Keep the role that was submitted
+var submitted = document.querySelector('[name=role]:checked');
+if (submitted) setRole(submitted.value);
+{% endif %}
+</script>
+</body>
+</html>

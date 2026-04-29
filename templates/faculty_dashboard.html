@@ -1,0 +1,153 @@
+{% from '_macros.html' import sidebar_faculty, page_header, stat_card, flash_messages, shortcuts_overlay, page_scripts, icon_students, icon_subject, icon_chart, icon_check_circle, icon_award, icon_alert %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Dashboard : SPARS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">    <style>
+        .dashboard-3col {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        @media (max-width: 1100px) { .dashboard-3col { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 700px) { .dashboard-3col { grid-template-columns: 1fr; } }
+        .performer-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem; }
+        .performer-header img { width: 38px; height: 38px; object-fit: contain; }
+        .top-performer-title { color: #059669; font-weight: 700; font-size: 1rem; }
+        .at-risk-title { color: #dc2626; font-weight: 700; font-size: 1rem; }
+        .sub-label { font-size: 0.72rem; color: var(--text-muted); }
+        .subject-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 1rem;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            color: white;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+<div class="layout">
+    {{ sidebar_faculty('dashboard', full_name) }}
+    <div class="main">
+        <div class="print-header">
+            <h1>SPARS : Faculty Dashboard</h1>
+        </div>
+
+        {{ page_header('Faculty Dashboard', 'Subject performance overview', [{'label': 'Dashboard', 'url': '#'}]) }}
+
+        <div class="subject-badge">
+            <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:white;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+            Subject: {{ subject_name }}
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="stat-grid">
+            {{ stat_card('Students in Subject', total_students, icon_students(), 'primary', accent='') }}
+            {{ stat_card('Subject', subject_name, icon_subject(), 'primary', accent='info') }}
+            {{ stat_card('Average Score', avg_percentage|string + '%', icon_chart(), 'primary', accent='') }}
+            <div class="stat-card accent-success">
+                <div class="stat-header">
+                    <span class="stat-label">Account Status</span>
+                    <div class="stat-icon success">{{ icon_check_circle() }}</div>
+                </div>
+                <div class="stat-value">
+                    <span class="badge badge-success badge-live" style="font-size:1rem;">Active</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3-column: Chart | Top | At-Risk -->
+        <div class="dashboard-3col">
+            <!-- Attainment Chart -->
+            <div class="glass-card">
+                <h3 style="color:#1e3a5f;">Attainment Distribution</h3>
+                {% if chart_data and (chart_data.low + chart_data.medium + chart_data.high) > 0 %}
+                <div style="position:relative;height:220px;">
+                    <canvas id="attainment-chart"></canvas>
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No data yet.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- Top Performers -->
+            <div class="glass-card">
+                <div class="performer-header">
+                    <img src="{{ url_for('static', filename='trophy_award.png') }}" alt="Trophy">
+                    <div>
+                        <div class="top-performer-title">Top Performers</div>
+                        <div class="sub-label">Best 5 - {{ subject_name }}</div>
+                    </div>
+                </div>
+                {% if top_performers %}
+                <ul class="performer-list">
+                    {% for s in top_performers %}
+                    <li>
+                        <span class="performer-rank top">#{{ loop.index }}</span>
+                        <a href="/student?search={{ s.reg_no }}" class="performer-name">{{ s.name }}</a>
+                        <span class="performer-score" style="color:#059669;">{{ s.avg_pct }}%</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted" style="font-size:0.85rem;">No data</p>
+                {% endif %}
+            </div>
+
+            <!-- At-Risk Students -->
+            <div class="glass-card">
+                <div class="performer-header">
+                    <img src="{{ url_for('static', filename='alert_student.png') }}" alt="Alert">
+                    <div>
+                        <div class="at-risk-title">At-Risk Students</div>
+                        <div class="sub-label">Lowest - {{ subject_name }}</div>
+                    </div>
+                </div>
+                {% if bottom_performers %}
+                <ul class="performer-list">
+                    {% for s in bottom_performers %}
+                    <li>
+                        <span class="performer-rank bottom">!</span>
+                        <a href="/student?search={{ s.reg_no }}" class="performer-name">{{ s.name }}</a>
+                        <span class="performer-score" style="color:#dc2626;">{{ s.avg_pct }}%</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted" style="font-size:0.85rem;">No at-risk students</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ shortcuts_overlay() }}
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script id="chart-data" type="application/json">{{ chart_data | tojson if chart_data else 'null' }}</script>
+<script>
+    (function() {
+        var el = document.getElementById('chart-data');
+        if (!el) return;
+        var raw = el.textContent.trim();
+        if (raw === 'null' || raw === '') return;
+        var chartData = JSON.parse(raw);
+        if ((chartData.low + chartData.medium + chartData.high) > 0) {
+            createAttainmentChart('attainment-chart', chartData, '');
+        }
+    })();
+</script>
+</body>
+</html>

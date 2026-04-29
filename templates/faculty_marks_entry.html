@@ -1,0 +1,230 @@
+{% from '_macros.html' import sidebar_faculty, page_header, flash_messages, shortcuts_overlay %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Marks Entry : SPARS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">    <style>
+        .marks-form-card { background:#ffffff; border:1px solid rgba(59,130,246,0.18); border-radius:14px; padding:1.5rem; box-shadow:0 2px 12px rgba(59,130,246,0.08); margin-bottom:1.5rem; }
+        .marks-fields { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1rem; }
+        @media(max-width:700px){ .marks-fields{grid-template-columns:1fr 1fr;} }
+        .marks-field label { display:block; font-size:0.75rem; font-weight:600; color:#4b6a8a; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.35rem; }
+        .marks-field .max-hint { font-size:0.7rem; color:#7a9cbf; margin-top:0.2rem; }
+        .student-found-card { background:linear-gradient(135deg,rgba(59,130,246,0.06),rgba(99,102,241,0.04)); border:1px solid rgba(59,130,246,0.2); border-radius:10px; padding:1rem 1.25rem; margin-bottom:1rem; display:flex; align-items:center; gap:1rem; }
+        .student-avatar-sm { width:46px;height:46px; border-radius:10px; background:linear-gradient(135deg,#3b82f6,#6366f1); display:flex;align-items:center;justify-content:center; font-size:1.2rem;font-weight:700;color:white;flex-shrink:0; }
+        .analysis-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:0.75rem; margin-bottom:1rem; }
+        @media(max-width:700px){ .analysis-grid{grid-template-columns:1fr 1fr;} }
+        .analysis-item { background:#f0f6ff; border-radius:8px; padding:0.75rem; text-align:center; }
+        .analysis-item .a-label { font-size:0.7rem;color:#4b6a8a;text-transform:uppercase;letter-spacing:0.05em;font-weight:600; }
+        .analysis-item .a-value { font-size:1.4rem;font-weight:700;color:#1e3a5f;margin-top:0.15rem; }
+        .analysis-item .a-sub { font-size:0.75rem;color:#7a9cbf; }
+        .attainment-badge { display:inline-block;padding:0.25rem 0.85rem;border-radius:50px;font-size:0.8rem;font-weight:600;margin-top:0.5rem; }
+        .attainment-badge.High { background:rgba(5,150,105,0.12);color:#059669; }
+        .attainment-badge.Medium { background:rgba(217,119,6,0.12);color:#d97706; }
+        .attainment-badge.Low { background:rgba(220,38,38,0.08);color:#dc2626; }
+        .search-bar-row { display:flex;gap:0.75rem;margin-bottom:1.25rem; }
+        .search-bar-row input { flex:1; }
+        .marks-null { color:#9fb3c8;font-style:italic; }
+        .pct-high{color:#059669;font-weight:600;} .pct-med{color:#d97706;font-weight:600;} .pct-low{color:#dc2626;font-weight:600;}
+        .co-radar-wrap { max-width:300px;margin:0 auto; }
+        table th,table td { white-space:nowrap; }
+    </style>
+</head>
+<body>
+<div class="layout">
+    {{ sidebar_faculty('marks', full_name) }}
+    <div class="main">
+        {{ page_header('Marks Entry', 'Enter & edit student marks for ' + subject_name, [{'label':'Dashboard','url':'/faculty_dashboard'},{'label':'Marks Entry','url':'#'}]) }}
+        {{ flash_messages() }}
+
+        {% if message %}
+        <div class="alert {{ 'alert-success' if msg_type == 'success' else 'alert-error' }}">
+            {{ '✓' if msg_type == 'success' else '✕' }} {{ message }}
+        </div>
+        {% endif %}
+
+        <!-- Subject Banner -->
+        <div style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 1rem;background:linear-gradient(135deg,#3b82f6,#6366f1);color:white;border-radius:50px;font-size:0.85rem;font-weight:600;margin-bottom:1.5rem;">
+            <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:white;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            Entering marks for: {{ subject_name }}
+        </div>
+
+        <!-- Student Search -->
+        <div class="marks-form-card">
+            <h3 style="margin-bottom:1rem;">Search Student to Enter Marks</h3>
+            <form method="GET" action="/faculty/marks_entry">
+                <div class="search-bar-row">
+                    <input type="text" name="search" value="{{ search or '' }}" placeholder="Search by Registration No or Name..." id="student-search">
+                    <button type="submit">Search</button>
+                </div>
+            </form>
+
+            {% if search and not searched_student %}
+            <div class="alert alert-error">✕ No student found for "{{ search }}"</div>
+            {% endif %}
+
+            {% if searched_student %}
+            <div class="student-found-card">
+                <div class="student-avatar-sm">{{ searched_student.name[0] }}</div>
+                <div>
+                    <div style="font-weight:700;color:#1e3a5f;font-size:1rem;">{{ searched_student.name }}</div>
+                    <div style="font-size:0.82rem;color:#4b6a8a;">Reg: {{ searched_student.reg_no }} · Sem {{ searched_student.semester }} · {{ searched_student.branch }}</div>
+                </div>
+            </div>
+
+            <!-- Marks Entry Form -->
+            <form method="POST" action="/faculty/marks_entry">
+                <input type="hidden" name="action" value="save_marks">
+                <input type="hidden" name="student_id" value="{{ searched_student.student_id }}">
+                <div class="marks-fields">
+                    <div class="marks-field">
+                        <label>Midsem</label>
+                        <input type="number" name="midsem" step="0.5" min="0" max="20"
+                               value="{{ student_marks.midsem_total if student_marks else '' }}" placeholder="0" required>
+                        <div class="max-hint">Out of 20</div>
+                    </div>
+                    <div class="marks-field">
+                        <label>Assignment</label>
+                        <input type="number" name="assignment" step="0.5" min="0" max="10"
+                               value="{{ student_marks.assignment_total if student_marks else '' }}" placeholder="0" required>
+                        <div class="max-hint">Out of 10</div>
+                    </div>
+                    <div class="marks-field">
+                        <label>Quiz</label>
+                        <input type="number" name="quiz" step="0.5" min="0" max="5"
+                               value="{{ student_marks.quiz_total if student_marks else '' }}" placeholder="0" required>
+                        <div class="max-hint">Out of 5</div>
+                    </div>
+                    <div class="marks-field">
+                        <label>Attendance</label>
+                        <input type="number" name="attendance" step="0.5" min="0" max="5"
+                               value="{{ student_marks.attendance_total if student_marks else '' }}" placeholder="0" required>
+                        <div class="max-hint">Out of 5</div>
+                    </div>
+                </div>
+                <button type="submit" style="width:100%;padding:0.75rem;">
+                    <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><polyline points="20 6 9 17 4 12"/></svg>
+                    {{ 'Update' if student_marks else 'Save' }} Marks for {{ searched_student.name }}
+                </button>
+            </form>
+            {% endif %}
+        </div>
+
+        <!-- Dynamic Analysis after Save -->
+        {% if analysis_student %}
+        <div class="marks-form-card">
+            <h3 style="color:#1e3a5f;margin-bottom:1rem;">
+                Dynamic Analysis - {{ analysis_student.name }}
+                <span class="attainment-badge {{ analysis_student.attainment }}">{{ analysis_student.attainment }}</span>
+            </h3>
+            <div class="analysis-grid">
+                <div class="analysis-item">
+                    <div class="a-label">Midsem</div>
+                    <div class="a-value">{{ analysis_student.midsem_total }}</div>
+                    <div class="a-sub">out of 20</div>
+                </div>
+                <div class="analysis-item">
+                    <div class="a-label">Assignment</div>
+                    <div class="a-value">{{ analysis_student.assignment_total }}</div>
+                    <div class="a-sub">out of 10</div>
+                </div>
+                <div class="analysis-item">
+                    <div class="a-label">Quiz</div>
+                    <div class="a-value">{{ analysis_student.quiz_total }}</div>
+                    <div class="a-sub">out of 5</div>
+                </div>
+                <div class="analysis-item">
+                    <div class="a-label">Attendance</div>
+                    <div class="a-value">{{ analysis_student.attendance_total }}</div>
+                    <div class="a-sub">out of 5</div>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+                <div>
+                    <div style="font-size:0.75rem;color:#4b6a8a;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Total Score</div>
+                    <div style="font-size:2rem;font-weight:800;color:#1e3a5f;">{{ analysis_student.total }}<span style="font-size:1rem;font-weight:500;color:#4b6a8a;">/40</span></div>
+                </div>
+                <div>
+                    <div style="font-size:0.75rem;color:#4b6a8a;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Percentage</div>
+                    <div style="font-size:2rem;font-weight:800;{% if analysis_student.percentage >= 70 %}color:#059669;{% elif analysis_student.percentage >= 40 %}color:#d97706;{% else %}color:#dc2626;{% endif %}">
+                        {{ analysis_student.percentage }}%
+                    </div>
+                </div>
+            </div>
+            <div class="co-radar-wrap">
+                <canvas id="analysis-radar"></canvas>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- All Students Table -->
+        <div class="table-container">
+            <div class="table-header">
+                <h3>All Students : {{ subject_name }}</h3>
+                <span class="table-count">{{ all_students|length }} students</span>
+            </div>
+            <div class="table-wrapper">
+                <table id="marks-table">
+                    <thead>
+                        <tr>
+                            <th>#</th><th>Name</th><th>Reg No</th>
+                            <th>Midsem /20</th><th>Quiz /5</th><th>Assign /10</th><th>Attend /5</th>
+                            <th>Total /40</th><th>%</th><th>Attainment</th><th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in all_students %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td style="font-weight:500;color:#1e3a5f;">{{ s.name }}</td>
+                            <td>{{ s.reg_no }}</td>
+                            <td>{% if s.midsem_total is not none %}{{ s.midsem_total }}{% else %}<span class="marks-null">-</span>{% endif %}</td>
+                            <td>{% if s.quiz_total is not none %}{{ s.quiz_total }}{% else %}<span class="marks-null">-</span>{% endif %}</td>
+                            <td>{% if s.assignment_total is not none %}{{ s.assignment_total }}{% else %}<span class="marks-null">-</span>{% endif %}</td>
+                            <td>{% if s.attendance_total is not none %}{{ s.attendance_total }}{% else %}<span class="marks-null">-</span>{% endif %}</td>
+                            <td style="font-weight:600;">{% if s.total is not none %}{{ s.total }}{% else %}<span class="marks-null">-</span>{% endif %}</td>
+                            <td>
+                                {% if s.percentage is not none %}
+                                <span class="{% if s.percentage >= 70 %}pct-high{% elif s.percentage >= 40 %}pct-med{% else %}pct-low{% endif %}">{{ s.percentage }}%</span>
+                                {% else %}<span class="marks-null">-</span>{% endif %}  
+                            </td>
+                            <td>
+                                {% if s.attainment %}
+                                <span class="attainment-badge {{ s.attainment }}" style="font-size:0.72rem;">{{ s.attainment }}</span>
+                                {% else %}<span class="marks-null">-</span>{% endif %}
+                            </td>
+                            <td>
+                                <a href="/faculty/marks_entry?search={{ s.reg_no }}" style="font-size:0.78rem;color:#3b82f6;font-weight:600;text-decoration:none;padding:0.25rem 0.6rem;background:rgba(59,130,246,0.08);border-radius:5px;border:1px solid rgba(59,130,246,0.2);">Edit</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ shortcuts_overlay() }}
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/table-utils.js') }}"></script>
+
+{% if analysis_student %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script>
+(function() {
+    var coData = [
+        {{ analysis_student.co1 or 0 }},
+        {{ analysis_student.co2 or 0 }},
+        {{ analysis_student.co3 or 0 }},
+        {{ analysis_student.co4 or 0 }},
+        {{ analysis_student.co5 or 0 }}
+    ];
+    createCORadarChart('analysis-radar', coData, 'CO Performance');
+})();
+</script>
+{% endif %}
+</body>
+</html>

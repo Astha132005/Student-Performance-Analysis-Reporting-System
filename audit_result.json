@@ -1,0 +1,45 @@
+{
+  "subjects": [
+    {
+      "subject_id": 1,
+      "subject_name": "ML",
+      "semester": 5,
+      "branch": "AIML"
+    },
+    {
+      "subject_id": 2,
+      "subject_name": "DVA",
+      "semester": 5,
+      "branch": "AIML"
+    },
+    {
+      "subject_id": 3,
+      "subject_name": "OS",
+      "semester": 3,
+      "branch": "AIML"
+    }
+  ],
+  "marks_distribution": [
+    {
+      "branch": "AIML",
+      "semester": 3,
+      "pass_year": 2028,
+      "subject_name": "OS",
+      "cnt": 85
+    },
+    {
+      "branch": "AIML",
+      "semester": 5,
+      "pass_year": 2027,
+      "subject_name": "DVA",
+      "cnt": 71
+    },
+    {
+      "branch": "AIML",
+      "semester": 5,
+      "pass_year": 2027,
+      "subject_name": "ML",
+      "cnt": 71
+    }
+  ]
+}

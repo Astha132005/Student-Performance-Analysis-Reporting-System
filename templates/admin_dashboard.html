@@ -1,0 +1,400 @@
+﻿{% from '_macros.html' import sidebar, page_header, stat_card, flash_messages, shortcuts_overlay, page_scripts, icon_students, icon_subject, icon_chart, icon_check_circle, icon_award, icon_alert %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard : SPARS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        .dashboard-3col {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        @media (max-width: 1100px) {
+            .dashboard-3col { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 700px) {
+            .dashboard-3col { grid-template-columns: 1fr; }
+        }
+        .performer-header {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 1rem;
+        }
+        .performer-header img {
+            width: 38px;
+            height: 38px;
+            object-fit: contain;
+        }
+        .performer-header h3 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+        .performer-header .sub-label {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 1px;
+        }
+        .top-performer-title { color: #059669; }
+        .at-risk-title { color: #dc2626; }
+        .chart-card-inner {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .chart-card-inner canvas {
+            max-height: 220px;
+        }
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        .quick-action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.55rem 1.1rem;
+            border-radius: 8px;
+            background: rgba(59,130,246,0.08);
+            border: 1px solid rgba(59,130,246,0.2);
+            color: #2563eb;
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .quick-action-btn:hover {
+            background: rgba(59,130,246,0.14);
+            color: #1d4ed8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(59,130,246,0.15);
+        }
+        .quick-action-btn svg {
+            width: 16px; height: 16px;
+            stroke: currentColor; fill: none;
+            stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+        }
+    </style>
+</head>
+<body>
+<div class="layout">
+    {{ sidebar('admin', 'dashboard') }}
+    <div class="main">
+        <div class="print-header">
+            <h1>SPARS : Admin Dashboard</h1>
+            <p>Student Performance Analysis &amp; Reporting System</p>
+        </div>
+
+        {{ page_header('Admin Dashboard', 'Overview of student performance and system status', [{'label': 'Dashboard', 'url': '#'}]) }}
+
+        {{ flash_messages() }}
+
+        <!-- Stat Cards -->
+        <div class="stat-grid">
+            {{ stat_card('Total Students', total_students, icon_students(), 'primary', accent='') }}
+            {{ stat_card('Total Subjects', total_subjects, icon_subject(), 'primary', accent='info') }}
+            {{ stat_card('Average Score', avg_percentage|string + '%', icon_chart(), 'primary', accent='') }}
+            <div class="stat-card accent-success">
+                <div class="stat-header">
+                    <span class="stat-label">Marks Entry</span>
+                    <div class="stat-icon success">{{ icon_check_circle() }}</div>
+                </div>
+                <div class="stat-value">
+                    <span class="badge badge-success badge-live" style="font-size:1rem;">Active</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard 3-Column Grid -->
+        <div class="dashboard-3col">
+
+            <!-- Attainment Chart -->
+            <div class="glass-card chart-card-inner">
+                <h3 style="color:#1e3a5f;">Overall Attainment Distribution</h3>
+                {% if chart_data and (chart_data.low + chart_data.medium + chart_data.high) > 0 %}
+                <div style="position:relative; height:220px;">
+                    <canvas id="attainment-chart"></canvas>
+                </div>
+                {% else %}
+                <div class="empty-state"><p>No attainment data yet.</p></div>
+                {% endif %}
+            </div>
+
+            <!-- Top Performers -->
+            <div class="glass-card">
+                <div class="performer-header">
+                    <img src="{{ url_for('static', filename='trophy_award.png') }}" alt="Trophy">
+                    <div>
+                        <div class="top-performer-title" style="font-weight:700; font-size:1rem;">Top Performers</div>
+                        <div class="sub-label">Best 5 students</div>
+                    </div>
+                </div>
+                {% if top_performers %}
+                <ul class="performer-list">
+                    {% for s in top_performers %}
+                    <li>
+                        <span class="performer-rank top">#{{ loop.index }}</span>
+                        <a href="/student?search={{ s.reg_no }}" class="performer-name">{{ s.name }}</a>
+                        <span class="performer-score" style="color:#059669;">{{ s.avg_pct }}%</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted" style="font-size:0.85rem;">No data available</p>
+                {% endif %}
+            </div>
+
+            <!-- At-Risk Students -->
+            <div class="glass-card">
+                <div class="performer-header">
+                    <img src="{{ url_for('static', filename='alert_student.png') }}" alt="Alert">
+                    <div>
+                        <div class="at-risk-title" style="font-weight:700; font-size:1rem;">At-Risk Students</div>
+                        <div class="sub-label">Lowest performers</div>
+                    </div>
+                </div>
+                {% if bottom_performers %}
+                <ul class="performer-list">
+                    {% for s in bottom_performers %}
+                    <li>
+                        <span class="performer-rank bottom">!</span>
+                        <a href="/student?search={{ s.reg_no }}" class="performer-name">{{ s.name }}</a>
+                        <span class="performer-score" style="color:#dc2626;">{{ s.avg_pct }}%</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted" style="font-size:0.85rem;">No at-risk students</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Batch Sunburst Charts -->
+        {% if batch_lollipop %}
+        <div style="margin-bottom:1.5rem;">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+                <div style="width:36px;height:36px;background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:white;fill:none;stroke-width:2;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                </div>
+                <div>
+                    <div style="font-weight:700;color:#1e3a5f;font-size:1rem;">Batch Score Comparison</div>
+                    <div style="font-size:0.75rem;color:#7a9cbf;">Component breakdown per subject &nbsp;&bull;&nbsp; Vibrant Neon : 2028 &nbsp;&bull;&nbsp; Magenta Fire : 2027</div>
+                </div>
+            </div>
+            <div class="glass-card" style="padding:1.25rem;">
+                <div id="density-comparison" style="height:400px;width:100%;"></div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="glass-card mt-xl">
+            <h2 class="mb-0">Quick Access</h2>
+            <p class="mb-lg">Navigate to analysis views and system management.</p>
+            <div class="quick-actions">
+                <a href="/batch_analysis" class="quick-action-btn">
+                    <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                    Batch Analysis
+                </a>
+                <a href="/subject_analysis" class="quick-action-btn">
+                    <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    Subject Analysis
+                </a>
+                <a href="/marks_entry" class="quick-action-btn">
+                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Mark's Entry
+                </a>
+                <a href="/student" class="quick-action-btn">
+                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    Student Search
+                </a>
+                <a href="/admin/teachers" class="quick-action-btn">
+                    <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Manage Teachers
+                </a>
+                <a href="/admin/students" class="quick-action-btn">
+                    <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    Manage Students
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ shortcuts_overlay() }}
+{{ page_scripts(role) }}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script id="chart-data" type="application/json">{{ chart_data | tojson if chart_data else 'null' }}</script>
+<script id="batch-data" type="application/json">{{ batch_lollipop | tojson if batch_lollipop else 'null' }}</script>
+<script>
+// Attainment doughnut
+(function() {
+    var el = document.getElementById('chart-data');
+    if (!el) return;
+    var raw = el.textContent.trim();
+    if (raw === 'null' || raw === '') return;
+    var d = JSON.parse(raw);
+    if ((d.low + d.medium + d.high) > 0)
+        createAttainmentChart('attainment-chart', d, 'Overall Attainment Distribution');
+})();
+
+// Stacked Bar â€” Dutch Field (2028) vs Pink Foam (2027) per component
+(function() {
+    var el = document.getElementById('batch-data');
+    if (!el) return;
+    var raw = el.textContent.trim();
+    if (raw === 'null' || raw === '') return;
+    var rows = JSON.parse(raw);
+    if (!rows || rows.length === 0) return;
+
+    var container = document.getElementById('density-comparison');
+    if (!container) return;
+    container.style.height = '420px';
+    var chart = echarts.init(container);
+
+    var subjects = rows.map(function(r) { return r.subject_name; });
+
+    // Dutch Field palette â€” earthy/warm for 2028 batch
+    var DF = { mid: '#01befe', quiz: '#ffdd00', assign: '#ff7d00', att: '#8f00ff' };
+    // Pink Foam palette â€” soft/pastel for 2027 batch
+    var PF = { mid: '#c200fb', quiz: '#ec0868', assign: '#fc2f00', att: '#ffbc0a' };
+
+    function fv(r, key) {
+        var val = r[key];
+        return (val !== null && val !== undefined) ? parseFloat(parseFloat(val).toFixed(2)) : 0;
+    }
+
+    chart.setOption({
+        backgroundColor: 'transparent',
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' },
+            backgroundColor: 'rgba(255,255,255,0.97)',
+            borderColor: 'rgba(59,130,246,0.18)',
+            borderWidth: 1,
+            padding: [14, 18],
+            textStyle: { color: '#1e3a5f', fontSize: 12 },
+            formatter: function(params) {
+                var subj = params[0].axisValue;
+                var g27 = { mid:0, quiz:0, assign:0, att:0 };
+                var g28 = { mid:0, quiz:0, assign:0, att:0 };
+                params.forEach(function(p) {
+                    var n = p.seriesName, val = p.value || 0;
+                    if (n==='Midsem 2028')     g28.mid=val;
+                    else if (n==='Quiz 2028')       g28.quiz=val;
+                    else if (n==='Assignment 2028') g28.assign=val;
+                    else if (n==='Attendance 2028') g28.att=val;
+                    else if (n==='Midsem 2027')     g27.mid=val;
+                    else if (n==='Quiz 2027')       g27.quiz=val;
+                    else if (n==='Assignment 2027') g27.assign=val;
+                    else if (n==='Attendance 2027') g27.att=val;
+                });
+                var t28=(g28.mid+g28.quiz+g28.assign+g28.att).toFixed(2);
+                var t27=(g27.mid+g27.quiz+g27.assign+g27.att).toFixed(2);
+                var has28=parseFloat(t28)>0, has27=parseFloat(t27)>0;
+                var html='<b style="font-size:14px;color:#1e3a5f;">'+subj+'</b><br/><br/>';
+                if (has28) {
+                    html+='<span style="color:'+DF.mid+';font-weight:700;">&#9632; 2028 Batch (Dutch Field)</span><br/>';
+                    html+='Midsem: <b>'+g28.mid.toFixed(2)+' / 20</b><br/>';
+                    html+='Quiz: <b>'+g28.quiz.toFixed(2)+' / 5</b><br/>';
+                    html+='Assignment: <b>'+g28.assign.toFixed(2)+' / 10</b><br/>';
+                    html+='Attendance: <b>'+g28.att.toFixed(2)+' / 5</b><br/>';
+                    html+='<b>Total: '+t28+' / 40</b><br/><br/>';
+                }
+                if (has27) {
+                    html+='<span style="color:'+PF.assign+';font-weight:700;">&#9632; 2027 Batch (Pink Foam)</span><br/>';
+                    html+='Midsem: <b>'+g27.mid.toFixed(2)+' / 20</b><br/>';
+                    html+='Quiz: <b>'+g27.quiz.toFixed(2)+' / 5</b><br/>';
+                    html+='Assignment: <b>'+g27.assign.toFixed(2)+' / 10</b><br/>';
+                    html+='Attendance: <b>'+g27.att.toFixed(2)+' / 5</b><br/>';
+                    html+='<b>Total: '+t27+' / 40</b>';
+                }
+                return html;
+            }
+        },
+        legend: {
+            data: [
+                { name: 'Midsem 2028',     icon: 'rect', itemStyle: { color: DF.mid } },
+                { name: 'Quiz 2028',       icon: 'rect', itemStyle: { color: DF.quiz } },
+                { name: 'Assignment 2028', icon: 'rect', itemStyle: { color: DF.assign } },
+                { name: 'Attendance 2028', icon: 'rect', itemStyle: { color: DF.att } },
+                { name: 'Midsem 2027',     icon: 'rect', itemStyle: { color: PF.mid } },
+                { name: 'Quiz 2027',       icon: 'rect', itemStyle: { color: PF.quiz } },
+                { name: 'Assignment 2027', icon: 'rect', itemStyle: { color: PF.assign } },
+                { name: 'Attendance 2027', icon: 'rect', itemStyle: { color: PF.att } }
+            ],
+            top: 4, left: 'center',
+            textStyle: { color: '#4b6a8a', fontSize: 11, fontWeight: '600' },
+            itemWidth: 13, itemHeight: 10, itemGap: 12
+        },
+        grid: { left: 20, right: 20, top: 60, bottom: 16, containLabel: true },
+        xAxis: {
+            type: 'category',
+            data: subjects,
+            axisLine: { lineStyle: { color: 'rgba(59,130,246,0.2)' } },
+            axisTick: { show: false },
+            axisLabel: { color: '#1e3a5f', fontWeight: '700', fontSize: 13 },
+            splitLine: { show: false }
+        },
+        yAxis: {
+            type: 'value', min: 0, max: 40,
+            name: 'Marks (out of 40)',
+            nameTextStyle: { color: '#7a9cbf', fontSize: 11, padding: [0,0,0,30] },
+            splitLine: { lineStyle: { color: 'rgba(59,130,246,0.07)', type: 'dashed' } },
+            axisLabel: { color: '#6b7280', fontSize: 11 },
+            axisLine: { show: false }, axisTick: { show: false }
+        },
+        series: [
+            // 2028 â€” Dutch Field
+            { name: 'Midsem 2028',     type: 'bar', stack: '2028', barMaxWidth: 64,
+              data: rows.map(function(r){ return fv(r,'mid_2028'); }),
+              itemStyle: { color: DF.mid } },
+            { name: 'Quiz 2028',       type: 'bar', stack: '2028', barMaxWidth: 64,
+              data: rows.map(function(r){ return fv(r,'quiz_2028'); }),
+              itemStyle: { color: DF.quiz } },
+            { name: 'Assignment 2028', type: 'bar', stack: '2028', barMaxWidth: 64,
+              data: rows.map(function(r){ return fv(r,'assign_2028'); }),
+              itemStyle: { color: DF.assign } },
+            { name: 'Attendance 2028', type: 'bar', stack: '2028', barMaxWidth: 64,
+              data: rows.map(function(r){ return fv(r,'att_2028'); }),
+              itemStyle: { color: DF.att, borderRadius: [4,4,0,0] },
+              label: { show: true, position: 'top', color: '#1e3a5f', fontWeight: '800', fontSize: 11,
+                formatter: function(p) {
+                    var r = rows[p.dataIndex];
+                    var t=(fv(r,'mid_2028')+fv(r,'quiz_2028')+fv(r,'assign_2028')+fv(r,'att_2028')).toFixed(1);
+                    return parseFloat(t)>0 ? t : '';
+                }} },
+            // 2027 â€” Pink Foam
+            { name: 'Midsem 2027',     type: 'bar', stack: '2027', barMaxWidth: 64,
+              data: rows.map(function(r){ return fv(r,'mid_2027'); }),
+              itemStyle: { color: PF.mid } },
+            { name: 'Quiz 2027',       type: 'bar', stack: '2027', barMaxWidth: 64,
+              data: rows.map(function(r){ return fv(r,'quiz_2027'); }),
+              itemStyle: { color: PF.quiz } },
+            { name: 'Assignment 2027', type: 'bar', stack: '2027', barMaxWidth: 64,
+              data: rows.map(function(r){ return fv(r,'assign_2027'); }),
+              itemStyle: { color: PF.assign } },
+            { name: 'Attendance 2027', type: 'bar', stack: '2027', barMaxWidth: 64,
+              data: rows.map(function(r){ return fv(r,'att_2027'); }),
+              itemStyle: { color: PF.att, borderRadius: [4,4,0,0] },
+              label: { show: true, position: 'top', color: '#7c0000', fontWeight: '800', fontSize: 11,
+                formatter: function(p) {
+                    var r = rows[p.dataIndex];
+                    var t=(fv(r,'mid_2027')+fv(r,'quiz_2027')+fv(r,'assign_2027')+fv(r,'att_2027')).toFixed(1);
+                    return parseFloat(t)>0 ? t : '';
+                }} }
+        ]
+    });
+    window.addEventListener('resize', function() { chart.resize(); });
+})();
+</script>
+</body>
+</html>

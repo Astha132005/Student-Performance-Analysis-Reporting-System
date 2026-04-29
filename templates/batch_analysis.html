@@ -1,0 +1,208 @@
+{% from '_macros.html' import sidebar, page_header, flash_messages, table_toolbar, shortcuts_overlay, page_scripts %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batch Analysis : SPARS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+
+<body>
+
+<div class="layout">
+
+    {{ sidebar('admin', 'batch') }}
+
+    <div class="main">
+
+        <div class="print-header"><h1>SPARS : Batch Wise Analysis</h1></div>
+
+        {% set breadcrumbs = [{'label': 'Dashboard', 'url': '/admin_dashboard'}, {'label': 'Batch Analysis', 'url': '#'}] %}
+        {{ page_header('Batch Wise Analysis', 'Analyze student performance across subjects for a specific batch', breadcrumbs) }}
+
+        <!-- Filters -->
+        <form method="get" class="filter-bar">
+            <div class="filter-group">
+                <span class="filter-label">Pass Year</span>
+                <select name="year" required>
+                    <option value="">Select Year</option>
+                    {% for y in years %}<option value="{{ y.pass_year }}" {% if request.args.get('year') == y.pass_year|string %}selected{% endif %}>{{ y.pass_year }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <span class="filter-label">Branch</span>
+                <select name="branch" required>
+                    <option value="">Select Branch</option>
+                    {% for b in branches %}<option value="{{ b.branch }}" {% if request.args.get('branch') == b.branch %}selected{% endif %}>{{ b.branch }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <span class="filter-label">Semester</span>
+                <select name="semester" required>
+                    <option value="">Select Semester</option>
+                    {% for s in semesters %}<option value="{{ s.semester }}" {% if request.args.get('semester') == s.semester|string %}selected{% endif %}>Semester {{ s.semester }}</option>{% endfor %}
+                </select>
+            </div>
+            <button type="submit"><svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> Apply</button>
+        </form>
+
+        {% if request.args.get('year') and request.args.get('branch') and request.args.get('semester') %}
+        <div class="filter-chips">
+            <span class="chip-label">Showing:</span>
+            <span class="badge badge-primary">{{ request.args.get('branch') }}</span>
+            <span class="badge badge-primary">Sem {{ request.args.get('semester') }}</span>
+            <span class="badge badge-primary">{{ request.args.get('year') }}</span>
+        </div>
+        {% endif %}
+
+        <!-- CO Attainment Summary Matrix -->
+        {% if subjects_data %}
+        <div class="co-matrix">
+            <div class="table-container">
+                <div class="table-header">
+                    <h3 class="mb-0">CO Attainment Summary Matrix</h3>
+                    <span class="badge badge-info">NBA/OBE Standard</span>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr><th>Subject</th><th>Students</th><th>CO1</th><th>CO2</th><th>CO3</th><th>CO4</th><th>CO5</th><th>Overall</th><th>Level</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for sub in subjects_data %}
+                            <tr>
+                                <td class="fw-600 text-primary">{{ sub.subject_name }}</td>
+                                <td>{{ sub.total_students }}</td>
+                                {% for co in sub.co_avgs %}
+                                <td><span class="co-cell {{ 'high' if co >= 70 else ('medium' if co >= 40 else 'low') }}">{{ co|round(1) }}</span></td>
+                                {% endfor %}
+                                <td class="fw-600">{{ sub.overall_avg|round(1) }}%</td>
+                                <td>
+                                    {% set lvl = sub.overall_avg %}
+                                    <span class="badge {{ 'badge-success' if lvl >= 70 else ('badge-warning' if lvl >= 40 else 'badge-danger') }}">
+                                        {{ 'High' if lvl >= 70 else ('Medium' if lvl >= 40 else 'Low') }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Subject-wise Loop -->
+        {% if subjects_data %}
+            {% for sub in subjects_data %}
+
+            <div class="section-divider">
+                <h2>{{ sub.subject_name }}</h2>
+                <span class="section-meta">{{ sub.total_students }} students</span>
+            </div>
+
+            <!-- Charts -->
+            <div class="graph-grid">
+                <div class="glass-card">
+                    <h3>CO Performance</h3>
+                    {% if sub.co_vals %}
+                    <canvas id="co-chart-{{ loop.index }}"></canvas>
+                    {% else %}
+                    <div class="empty-state"><p>No CO data available</p></div>
+                    {% endif %}
+                </div>
+
+                <div class="glass-card" style="display:flex; flex-direction:column;">
+                    <h3>Attainment Levels</h3>
+                    <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 0.75rem;">Low &lt; 40% · Medium 40 - 70% · High &gt; 70%</p>
+                    {% if sub.pie_data and (sub.pie_data.low + sub.pie_data.medium + sub.pie_data.high) > 0 %}
+                    <div style="flex:1; position:relative; min-height:260px;">
+                        <canvas id="pie-chart-{{ loop.index }}" style="width:100% !important; height:100% !important;"></canvas>
+                    </div>
+                    {% else %}
+                    <div class="empty-state"><p>No attainment data</p></div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Low Scorers -->
+            <div class="table-container">
+                <div class="table-header">
+                    <h3 class="mb-0 text-danger">⚠ Attention Required: Low Scorers</h3>
+                    <span class="text-muted" style="font-size: 0.8rem;">Midsem &lt; 30% (below 6/20)</span>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Student Name</th><th>Midsem Marks</th></tr></thead>
+                        <tbody>
+                            {% if sub.low_scorers %}
+                                {% for s in sub.low_scorers %}
+                                <tr class="danger-row">
+                                    <td data-editable data-table="students" data-id="{{ s.student_id }}" data-field="name">
+                                        <a href="/student?search={{ s.reg_no }}" style="color: inherit; text-decoration: none; border-bottom: 1px dashed rgba(255,255,255,0.4);">{{ s.name }}</a>
+                                    </td>
+                                    <td><span data-editable data-table="marks" data-id="{{ s.marks_id }}" data-field="midsem_total">{{ s.midsem_total }}</span> / 20</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr><td colspan="2" style="text-align: center; padding: 1.5rem;" class="text-success">✅ No low scorers. Excellent!</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {% if not loop.last %}<hr>{% endif %}
+            {% endfor %}
+
+        {% else %}
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                {% if request.args.get('year') %}
+                <h3>No data found for the selected filters.</h3>
+                <p>No subjects have marks data for this batch yet.</p>
+                {% else %}
+                <h3>Select filters to view batch analysis.</h3>
+                <p>Choose Pass Year, Branch, and Semester then click Apply.</p>
+                {% endif %}
+            </div>
+        {% endif %}
+
+    </div>
+
+</div>
+
+{{ shortcuts_overlay() }}
+{{ page_scripts(role) }}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% if subjects_data %}
+<div style="display: none;">
+    {% for sub in subjects_data %}
+        {% if sub.co_vals %}
+        <script class="co-chart-data" data-canvas="co-chart-{{ loop.index }}" data-label="{{ sub.subject_name }} CO Mapping" type="application/json">{{ sub.co_vals | tojson }}</script>
+        {% endif %}
+        {% if sub.pie_data and (sub.pie_data.low + sub.pie_data.medium + sub.pie_data.high) > 0 %}
+        <script class="pie-chart-data" data-canvas="pie-chart-{{ loop.index }}" data-label="{{ sub.subject_name }}" type="application/json">{{ sub.pie_data | tojson }}</script>
+        {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+<script>
+    document.querySelectorAll('.co-chart-data').forEach(el => {
+        if (el.textContent && el.textContent.trim() !== 'null' && el.textContent.trim() !== '') {
+            createCOBarChart(el.dataset.canvas, JSON.parse(el.textContent), el.dataset.label);
+        }
+    });
+    document.querySelectorAll('.pie-chart-data').forEach(el => {
+        if (el.textContent && el.textContent.trim() !== 'null' && el.textContent.trim() !== '') {
+            createAttainmentChart(el.dataset.canvas, JSON.parse(el.textContent), el.dataset.label);
+        }
+    });
+</script>
+
+</body>
+</html>

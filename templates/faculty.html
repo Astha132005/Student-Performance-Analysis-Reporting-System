@@ -1,0 +1,114 @@
+{% from '_macros.html' import sidebar, page_header, stat_card, flash_messages, table_toolbar, shortcuts_overlay, page_scripts, icon_students, icon_chart, icon_check_circle %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Subject : Faculty - SPARS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+
+<body>
+
+<div class="layout">
+
+    {{ sidebar('faculty', 'my_subject', subject_name) }}
+
+    <div class="main">
+
+        <div class="print-header">
+            <h1>SPARS : {{ subject_name }} Performance Report</h1>
+        </div>
+
+        {% set breadcrumbs = [{'label': 'Dashboard', 'url': '/faculty_dashboard'}, {'label': 'My Subject', 'url': '#'}] %}
+        {{ page_header('Batch Performance : ' + subject_name, 'Performance overview for ' + subject_name, breadcrumbs) }}
+
+        <!-- Flash Messages -->
+        {{ flash_messages() }}
+
+        <!-- Upload Section (when permission active) -->
+        {% if permission_active %}
+        <div class="glass-card mb-xl" style="border-color: var(--success-border);">
+            <div class="flex justify-between items-center mb-lg" style="flex-wrap: wrap; gap: 1rem;">
+                <div>
+                    <h2 style="font-size: 1.15rem; margin-bottom: 0.15rem; display: flex; align-items: center; gap: 0.5rem;">
+                        {{ icon_upload() }} Upload Marks
+                    </h2>
+                    <p class="text-muted" style="font-size: 0.8rem;">Upload .xlsx files for each component</p>
+                </div>
+                <span class="badge badge-live">⏱ {{ time_remaining }} remaining</span>
+            </div>
+
+            <div class="upload-grid">
+                {% set components = [('midsem', 'Midsem'), ('quiz', 'Quiz'), ('assignment', 'Assignment'), ('attendance', 'Attendance')] %}
+                {% for comp_val, comp_label in components %}
+                <div class="upload-card">
+                    <h3 class="mb-sm">{{ comp_label }}</h3>
+                    <div class="upload-status mb-md">
+                        {% if upload_status.get(comp_val) %}
+                        <span class="text-success">✅ Uploaded</span>
+                        {% else %}
+                        <span class="text-muted">Not uploaded</span>
+                        {% endif %}
+                    </div>
+                    <form action="/faculty_upload" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="component" value="{{ comp_val }}">
+                        <input type="file" name="file" accept=".xlsx" required class="mb-sm">
+                        <button type="submit" class="w-full btn-sm">Upload</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Summary Cards -->
+        <div class="stat-grid">
+            {{ stat_card('Total Students', students|length, icon_students(), 'primary') }}
+            {{ stat_card('Average Score', avg|string + '%', icon_chart(), 'primary', accent='info') }}
+        </div>
+
+        <!-- Student Performance Table -->
+        <div class="table-container">
+            {{ table_toolbar('faculty-subject-table', 'Detailed Student Performance', subject_name + '_performance') }}
+            <div class="table-wrapper">
+                <table id="faculty-subject-table" class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Reg No</th>
+                            <th>Name</th>
+                            <th>CO1</th><th>CO2</th><th>CO3</th><th>CO4</th><th>CO5</th>
+                            <th>Overall %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in students %}
+                        <tr>
+                            <td><span class="rank-badge">#{{ loop.index }}</span></td>
+                            <td><a href="/student?search={{ s.reg_no }}" class="text-purple fw-600">{{ s.reg_no }}</a></td>
+                            <td class="text-primary">
+                                <a href="/student?search={{ s.reg_no }}" style="color: inherit; text-decoration: none; border-bottom: 1px dashed rgba(255,255,255,0.3);">{{ s.name }}</a>
+                            </td>
+                            <td>{{ s.co1 }}</td>
+                            <td>{{ s.co2 }}</td>
+                            <td>{{ s.co3 }}</td>
+                            <td>{{ s.co4 }}</td>
+                            <td>{{ s.co5 }}</td>
+                            <td class="fw-600 text-primary">{{ s.percentage }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+{{ shortcuts_overlay() }}
+{{ page_scripts() }}
+
+</body>
+</html>

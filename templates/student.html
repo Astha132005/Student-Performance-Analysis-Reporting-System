@@ -1,0 +1,399 @@
+{% from '_macros.html' import sidebar, sidebar_faculty, page_header, table_toolbar, shortcuts_overlay, page_scripts %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Performance : SPARS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        /* ── Subject charts section ── */
+        .subject-charts-section { margin-top: 2rem; }
+        .subject-charts-section > h2 {
+            font-size: 1.1rem; font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 1.1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--glass-border);
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+
+        /* Grid: 1 card per subject, each card has 2 charts side-by-side */
+        .subjects-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.25rem;
+        }
+        @media (max-width: 900px) { .subjects-grid { grid-template-columns: 1fr; } }
+
+        /* Subject card */
+        .subj-chart-card { overflow: hidden; }
+        .subj-card-head {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 0.3rem;
+        }
+        .subj-card-head h3 { font-size: 0.98rem; font-weight: 700; margin: 0; }
+        .subj-score-line {
+            font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.85rem; font-weight: 600;
+        }
+        .subj-score-line span { color: var(--primary); font-weight: 800; }
+
+        /* Two-chart row inside each card */
+        .dual-chart-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+        .chart-pane { min-width: 0; min-height: 220px; position: relative; }
+        .chart-pane-title {
+            font-size: 0.72rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.06em;
+            color: var(--text-muted); margin-bottom: 0.4rem;
+            text-align: center;
+        }
+        .chart-pane canvas { display: block; width: 100% !important; min-height: 190px; }
+    </style>
+</head>
+<body>
+<div class="layout">
+
+    {% if role == 'admin' %}
+        {{ sidebar('admin', 'student') }}
+    {% else %}
+        {{ sidebar_faculty('student', session.get('full_name', session.get('user', ''))) }}
+    {% endif %}
+
+    <div class="main">
+
+        <div class="print-header">
+            <h1>SPARS : Student Performance Report</h1>
+            {% if student %}<p>{{ student.name }} ({{ student.reg_no }})</p>{% endif %}
+        </div>
+
+        {% if role == 'admin' %}
+            {% set breadcrumbs = [{'label':'Dashboard','url':'/admin_dashboard'},{'label':'Student Search','url':'#'}] %}
+        {% else %}
+            {% set breadcrumbs = [{'label':'Dashboard','url':'/faculty_dashboard'},{'label':'Student Search','url':'#'}] %}
+        {% endif %}
+        {{ page_header('Student Performance','Search and view individual student performance reports', breadcrumbs) }}
+
+        <!-- Search Bar -->
+        <form method="get" class="filter-bar" style="max-width:600px;margin-bottom:var(--space-xl);">
+            <div class="filter-group" style="flex:3;">
+                <span class="filter-label">Registration Number</span>
+                <input type="text" name="search" placeholder="e.g. 23052" value="{{ search_query }}" required>
+            </div>
+            <button type="submit">
+                <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                Search
+            </button>
+        </form>
+
+        {% if error_msg %}
+        <div class="empty-state">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <h3 class="text-danger">{{ error_msg }}</h3>
+        </div>
+
+        {% elif student %}
+
+        <!-- Student Profile -->
+        <div class="glass-panel mb-xl">
+            <div class="student-profile">
+                <div class="student-avatar">{{ student.name[0]|upper if student.name else '?' }}</div>
+                <div style="flex:1;">
+                    <h2 style="font-size:1.5rem;margin-bottom:0.25rem;"
+                        {% if role=='admin' %}data-editable data-table="students" data-id="{{ student.student_id }}" data-field="name"{% endif %}>
+                        {{ student.name }}
+                    </h2>
+                    <p style="font-size:0.9rem;">
+                        Reg No: <span class="fw-600 text-primary"
+                            {% if role=='admin' %}data-editable data-table="students" data-id="{{ student.student_id }}" data-field="reg_no"{% endif %}>
+                            {{ student.reg_no }}
+                        </span>
+                    </p>
+                    <div class="student-info-badges">
+                        <span class="badge badge-neutral">{{ student.branch }}</span>
+                        <span class="badge badge-neutral">Semester {{ student.semester }}</span>
+                        <span class="badge badge-neutral">Batch {{ student.pass_year }}</span>
+                    </div>
+                </div>
+                <div style="text-align:center;">
+                    <p class="text-muted" style="font-size:0.8rem;margin-bottom:0.25rem;">Overall Score</p>
+                    <p style="font-size:2.5rem;font-weight:700;line-height:1;" data-counter>
+                        {{ overall_percentage }}<span class="text-purple" style="font-size:1.2rem;">%</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        {% if marks %}
+
+        <!-- Average CO Charts -->
+        {% if co_data %}
+        <div class="graph-grid">
+            <div class="glass-card">
+                <h3 class="mb-md">Average CO Performance</h3>
+                <div style="max-width:420px;margin:0 auto;"><canvas id="student-radar-chart"></canvas></div>
+            </div>
+            <div class="glass-card">
+                <h3 class="mb-md">CO Scores</h3>
+                <canvas id="student-bar-chart"></canvas>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Per-Subject: Population Pyramid + Stacked Bar -->
+        {% if per_subject_intensity %}
+        <div class="subject-charts-section">
+            <h2>
+                <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--primary);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                Subject-wise CO Attainment &amp; Marks Breakdown
+            </h2>
+            <div class="subjects-grid">
+                {% for subj in per_subject_intensity %}
+                <div class="glass-card subj-chart-card">
+                    <div class="subj-card-head">
+                        <h3>{{ subj.subject_name }}</h3>
+                        <span class="badge {{ 'badge-success' if subj.attainment=='High' else ('badge-warning' if subj.attainment=='Medium' else 'badge-danger') }}">
+                            {{ subj.attainment }}
+                        </span>
+                    </div>
+                    <p class="subj-score-line">Overall Score: <span>{{ subj.percentage }}%</span></p>
+
+                    <div class="dual-chart-row">
+                        <!-- Left: Population Pyramid — CO Attainment -->
+                        <div class="chart-pane">
+                            <p class="chart-pane-title">CO Attainment</p>
+                            <div style="position:relative;height:200px;">
+                                <canvas id="pyramid-{{ loop.index0 }}"></canvas>
+                            </div>
+                        </div>
+                        <!-- Right: Stacked Bar — Marks by Component per CO -->
+                        <div class="chart-pane">
+                            <p class="chart-pane-title">Marks by Component</p>
+                            <div style="position:relative;height:200px;">
+                                <canvas id="stacked-{{ loop.index0 }}"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Marks Table -->
+        <div class="table-container" style="margin-top:2rem;">
+            {{ table_toolbar('student-marks-table','Subject-wise Performance Breakdown','student_'+search_query) }}
+            <div class="table-wrapper">
+                <table id="student-marks-table" class="data-table">
+                    <thead>
+                        <tr><th>Subject</th><th>CO1</th><th>CO2</th><th>CO3</th><th>CO4</th><th>CO5</th><th>Percentage</th><th>Attainment</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for m in marks %}
+                        <tr>
+                            <td class="fw-600 text-primary">{{ m.subject_name }}</td>
+                            <td {% if role=='admin' %}data-editable data-table="marks" data-id="{{ m.marks_id }}" data-field="co1"{% endif %}>{{ m.co1 }}</td>
+                            <td {% if role=='admin' %}data-editable data-table="marks" data-id="{{ m.marks_id }}" data-field="co2"{% endif %}>{{ m.co2 }}</td>
+                            <td {% if role=='admin' %}data-editable data-table="marks" data-id="{{ m.marks_id }}" data-field="co3"{% endif %}>{{ m.co3 }}</td>
+                            <td {% if role=='admin' %}data-editable data-table="marks" data-id="{{ m.marks_id }}" data-field="co4"{% endif %}>{{ m.co4 }}</td>
+                            <td {% if role=='admin' %}data-editable data-table="marks" data-id="{{ m.marks_id }}" data-field="co5"{% endif %}>{{ m.co5 }}</td>
+                            <td class="fw-600 text-purple" {% if role=='admin' %}data-editable data-table="marks" data-id="{{ m.marks_id }}" data-field="percentage"{% endif %}>{{ m.percentage }}%</td>
+                            <td>
+                                {% set att = m.attainment %}
+                                <span class="badge {{ 'badge-success' if att=='High' else ('badge-warning' if att=='Medium' else 'badge-danger') }}"
+                                    {% if role=='admin' %}data-editable data-table="marks" data-id="{{ m.marks_id }}" data-field="attainment"{% endif %}>
+                                    {{ att }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-state">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <h3>Enter a Registration ID to see a student's full performance report.</h3>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+{{ shortcuts_overlay() }}
+{{ page_scripts(role) }}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script id="co-data"          type="application/json">{{ co_data           | tojson if co_data           else 'null' }}</script>
+<script id="per-subject-data" type="application/json">{{ per_subject_intensity | tojson if per_subject_intensity else '[]'   }}</script>
+
+<script>
+// ── Helper: detect dark mode ──
+function isDark() {
+    return document.documentElement.getAttribute('data-theme') === 'dark';
+}
+function chartTextColor()  { return isDark() ? '#cbd5e1' : '#4b6a8a'; }
+function chartGridColor()  { return isDark() ? 'rgba(255,255,255,0.08)' : 'rgba(59,130,246,0.08)'; }
+
+// ── Average CO charts ──
+const coDataEl = document.getElementById('co-data');
+if (coDataEl && coDataEl.textContent.trim() !== 'null') {
+    const coData = JSON.parse(coDataEl.textContent);
+    if (coData) {
+        createCORadarChart('student-radar-chart', coData, 'Average CO Mapping');
+        createCOBarChart('student-bar-chart', coData, 'Average CO Scores');
+    }
+}
+
+// ── Per-subject charts ──
+const CO_LABELS  = ['CO1','CO2','CO3','CO4','CO5'];
+const CO_COLORS  = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'];
+const COMP_PALETTE = {
+    'Mid Sem':    { bg: 'rgba(59,130,246,0.82)',  border: '#3b82f6' },
+    'Quiz':       { bg: 'rgba(16,185,129,0.82)',  border: '#10b981' },
+    'Assignment': { bg: 'rgba(245,158,11,0.82)',  border: '#f59e0b' },
+    'Attendance': { bg: 'rgba(139,92,246,0.82)',  border: '#8b5cf6' },
+};
+
+function buildPopulationPyramid(canvasId, subjData) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    const totals = subjData.totals; // [co1_total, co2_total, ...]
+    const maxVal = Math.max(...totals, 1);
+    // Population Pyramid = horizontal bars with CO labels on Y, bars going right
+    // We mirror with a "max - val" on the left (shadow bar) to create pyramid feel
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: CO_LABELS,
+            datasets: [
+                {
+                    label: 'Score',
+                    data: totals,
+                    backgroundColor: CO_COLORS,
+                    borderColor: CO_COLORS,
+                    borderWidth: 1.5,
+                    borderRadius: 5,
+                    barThickness: 18,
+                },
+                {
+                    label: 'Remaining',
+                    data: totals.map(v => maxVal - v),
+                    backgroundColor: isDark() ? 'rgba(255,255,255,0.06)' : 'rgba(59,130,246,0.07)',
+                    borderColor: 'transparent',
+                    borderWidth: 0,
+                    borderRadius: 5,
+                    barThickness: 18,
+                }
+            ]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(c) {
+                            if (c.datasetIndex === 1) return null;
+                            return ' ' + c.raw.toFixed(1);
+                        }
+                    },
+                    filter: item => item.datasetIndex === 0
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    max: maxVal * 1.15,
+                    grid: { color: chartGridColor(), lineWidth: 1 },
+                    ticks: { color: chartTextColor(), font: { size: 10 }, maxTicksLimit: 5 },
+                    border: { display: false }
+                },
+                y: {
+                    stacked: true,
+                    grid: { display: false },
+                    ticks: { color: chartTextColor(), font: { size: 11, weight: '600' } },
+                    border: { display: false }
+                }
+            }
+        }
+    });
+}
+
+function buildStackedBar(canvasId, subjData) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    const components = subjData.components; // { 'Mid Sem': {values:[...]}, ... }
+    const compNames = Object.keys(components);
+
+    const datasets = compNames.map(name => {
+        const pal = COMP_PALETTE[name] || { bg: 'rgba(100,100,100,0.7)', border: '#666' };
+        return {
+            label: name,
+            data: components[name].values,
+            backgroundColor: pal.bg,
+            borderColor: pal.border,
+            borderWidth: 1,
+            borderRadius: 3,
+        };
+    });
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: { labels: CO_LABELS, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        color: chartTextColor(),
+                        font: { size: 9 },
+                        padding: 8,
+                        boxWidth: 10,
+                        boxHeight: 10,
+                    }
+                },
+                tooltip: { mode: 'index' }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    grid: { display: false },
+                    ticks: { color: chartTextColor(), font: { size: 10, weight: '600' } },
+                    border: { display: false }
+                },
+                y: {
+                    stacked: true,
+                    grid: { color: chartGridColor(), lineWidth: 1 },
+                    ticks: { color: chartTextColor(), font: { size: 9 }, maxTicksLimit: 5 },
+                    border: { display: false }
+                }
+            }
+        }
+    });
+}
+
+// Build all per-subject charts
+const psd = document.getElementById('per-subject-data');
+if (psd) {
+    const subjects = JSON.parse(psd.textContent || '[]');
+    subjects.forEach(function(subj, idx) {
+        buildPopulationPyramid('pyramid-' + idx, subj);
+        buildStackedBar('stacked-' + idx, subj);
+    });
+}
+</script>
+</body>
+</html>
